@@ -1,0 +1,23 @@
+[package]
+name = "mz-hyprnurs"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+eframe = "0.29"
+egui = "0.29"
+rfd = "0.15"
+printpdf = "0.3"
+image = { version = "0.25", default-features = false, features = ["png"] }
+zip = "2"
+chrono = { version = "0.4", features = ["clock"] }
+
+[build-dependencies]
+winresource = "0.1"
+
+[profile.release]
+opt-level     = 3
+lto           = "thin"
+codegen-units = 1
+strip         = true
+panic         = "abort"
