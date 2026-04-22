@@ -43,6 +43,40 @@ fn omarchy_farben_laden() -> Option<HashMap<String, Color32>> {
     Some(farben)
 }
 
+// sRGB-Kanal [0..=255] → linearer Wert [0..=1]
+fn srgb_zu_linear(kanal: u8) -> f32 {
+    let x = kanal as f32 / 255.0;
+    if x <= 0.04045 { x / 12.92 } else { ((x + 0.055) / 1.055).powf(2.4) }
+}
+
+// Linearer Wert [0..=1] → sRGB-Kanal [0..=255]
+fn linear_zu_srgb(x: f32) -> u8 {
+    let v = if x <= 0.0031308 { x * 12.92 } else { 1.055 * x.powf(1.0 / 2.4) - 0.055 };
+    (v.clamp(0.0, 1.0) * 255.0).round() as u8
+}
+
+/// WCAG-konforme relative Luminanz [0..=1].
+fn luminanz(c: Color32) -> f32 {
+    let [r, g, b, _] = c.to_array();
+    0.2126 * srgb_zu_linear(r) + 0.7152 * srgb_zu_linear(g) + 0.0722 * srgb_zu_linear(b)
+}
+
+/// Linearer Farbmix im sRGB-linearen Raum. t=0 → a, t=1 → b.
+fn mischen(a: Color32, b: Color32, t: f32) -> Color32 {
+    let [ar, ag, ab, _] = a.to_array();
+    let [br, bg, bb, _] = b.to_array();
+    let t = t.clamp(0.0, 1.0);
+    let kanal = |x: u8, y: u8| {
+        linear_zu_srgb(srgb_zu_linear(x) * (1.0 - t) + srgb_zu_linear(y) * t)
+    };
+    Color32::from_rgb(kanal(ar, br), kanal(ag, bg), kanal(ab, bb))
+}
+
+/// true, wenn die Farbe eher hell wirkt [Luminanz > 0.5].
+fn ist_hell(c: Color32) -> bool {
+    luminanz(c) > 0.5
+}
+
 // ── Design-Konstanten ────────────────────────────────────────────────────────
 const KARTE_B: f32 = 590.0;
 const KARTE_ABSTAND: f32 = 24.0;
@@ -479,16 +513,38 @@ impl AktFarben {
     fn von_theme(theme: Theme, omarchy: Option<&HashMap<String, Color32>>) -> Self {
         if theme == Theme::Omarchy {
             if let Some(f) = omarchy {
-                let akzent   = f.get("accent")     .copied().unwrap_or(Color32::from_rgb(122, 162, 247));
-                let bg       = f.get("background") .copied().unwrap_or(Color32::from_rgb(26, 27, 37));
-                let fg       = f.get("foreground") .copied().unwrap_or(Color32::from_gray(200));
-                let bez      = f.get("color3")     .copied().unwrap_or(Color32::from_gray(140));
-                let trenn    = f.get("color8")     .copied().unwrap_or(Color32::from_gray(55));
-                let hover    = f.get("color8")     .copied().unwrap_or(bg.linear_multiply(1.4));
+                // Stabile Keys der Omarchy-colors.toml direkt übernehmen.
+                let bg     = f.get("background").copied().unwrap_or(Color32::from_rgb(26, 27, 37));
+                let fg     = f.get("foreground").copied().unwrap_or(Color32::from_gray(200));
+                let akzent = f.get("accent")    .copied().unwrap_or(Color32::from_rgb(122, 162, 247));
+
+                // UI-Chrome aus fg/bg-Blend ableiten, adaptiv für helle vs. dunkle Themes.
+                let (t_hover, t_trenn, t_bez) = if ist_hell(bg) {
+                    (0.06, 0.18, 0.30)
+                } else {
+                    (0.08, 0.18, 0.50)
+                };
+                let hover = mischen(bg, fg, t_hover);
+                let trenn = mischen(bg, fg, t_trenn);
+                let bez   = mischen(fg, bg, t_bez);
+
+                // Kopftext: Schwarz auf hellem Akzent, sonst Weiß.
+                let (kopf_text, kopf_dim) = if luminanz(akzent) > 0.18 {
+                    (Color32::BLACK, Color32::from_black_alpha(160))
+                } else {
+                    (Color32::WHITE, Color32::from_white_alpha(160))
+                };
+
                 return Self {
-                    akzent, karten_bg: bg, karten_hover: hover, fenster_bg: bg,
-                    text: fg, bezeichnung: bez, trennlinie: trenn,
-                    kopf_text: Color32::WHITE, kopf_dim: Color32::from_white_alpha(140),
+                    akzent,
+                    karten_bg:    bg,
+                    karten_hover: hover,
+                    fenster_bg:   bg,
+                    text:         fg,
+                    bezeichnung:  bez,
+                    trennlinie:   trenn,
+                    kopf_text,
+                    kopf_dim,
                 };
             }
         }
@@ -2456,30 +2512,60 @@ impl eframe::App for MzHyprNursApp {
                 ctx.set_visuals(visuals);
             }
             Theme::Omarchy => {
-                let mut visuals = egui::Visuals::dark();
                 if let Some(ref farben) = omarchy_farben {
-                    if let Some(bg) = farben.get("background") {
-                        visuals.panel_fill = *bg;
-                        visuals.window_fill = *bg;
-                        visuals.extreme_bg_color = *bg;
+                    let bg     = farben.get("background").copied().unwrap_or(Color32::from_rgb(26, 27, 37));
+                    let fg     = farben.get("foreground").copied().unwrap_or(Color32::from_gray(200));
+                    let akzent = farben.get("accent")    .copied().unwrap_or(Color32::from_rgb(122, 162, 247));
+
+                    // Light/Dark-Basis nach Hintergrund-Helligkeit wählen.
+                    let mut visuals = if ist_hell(bg) {
+                        egui::Visuals::light()
+                    } else {
+                        egui::Visuals::dark()
+                    };
+
+                    // Flächenfarben direkt aus colors.toml.
+                    visuals.panel_fill       = bg;
+                    visuals.window_fill      = bg;
+                    visuals.extreme_bg_color = bg;
+
+                    // Trennlinien/Rahmen aus fg/bg-Blend [nicht mehr aus cursor oder color8].
+                    let trenn = mischen(bg, fg, 0.18);
+                    let trennstrich = Stroke::new(1.0, trenn);
+                    visuals.widgets.noninteractive.bg_stroke = trennstrich;
+                    visuals.widgets.inactive.bg_stroke       = trennstrich;
+
+                    // Primärtext folgt dem foreground der Theme-Datei.
+                    visuals.widgets.noninteractive.fg_stroke = Stroke::new(1.0, fg);
+
+                    // Interaktive Widgets: Akzent als Strich.
+                    let akzent_strich = Stroke::new(1.0, akzent);
+                    visuals.widgets.inactive.fg_stroke = akzent_strich;
+                    visuals.widgets.hovered.fg_stroke  = akzent_strich;
+                    visuals.widgets.active.fg_stroke   = akzent_strich;
+
+                    // Selektion direkt aus colors.toml nutzen, sonst Akzent.
+                    visuals.selection.bg_fill = farben
+                        .get("selection_background")
+                        .copied()
+                        .unwrap_or(akzent);
+                    if let Some(sel_fg) = farben.get("selection_foreground").copied() {
+                        visuals.selection.stroke = Stroke::new(1.0, sel_fg);
                     }
-                    if let Some(cursor) = farben.get("cursor") {
-                        visuals.widgets.noninteractive.fg_stroke = Stroke::new(1.0, *cursor);
-                    }
-                    if let Some(akzent) = farben.get("accent") {
-                        let strich = Stroke::new(1.0, *akzent);
-                        visuals.widgets.inactive.fg_stroke = strich;
-                        visuals.widgets.hovered.fg_stroke = strich;
-                        visuals.widgets.active.fg_stroke = strich;
-                        visuals.selection.bg_fill = *akzent;
-                        visuals.hyperlink_color = *akzent;
-                        visuals.widgets.hovered.bg_fill = akzent.linear_multiply(0.3);
-                    }
+
+                    visuals.hyperlink_color = akzent;
+
+                    // Hover-Fläche dezent mit Akzent tönen [funktioniert für hell und dunkel].
+                    visuals.widgets.hovered.bg_fill = mischen(bg, akzent, 0.20);
+
+                    ctx.set_visuals(visuals);
                 } else {
-                    visuals.panel_fill = Color32::from_rgb(26, 27, 37);
+                    // Fallback, wenn ~/.config/omarchy/current/theme/colors.toml fehlt.
+                    let mut visuals = egui::Visuals::dark();
+                    visuals.panel_fill  = Color32::from_rgb(26, 27, 37);
                     visuals.window_fill = Color32::from_rgb(26, 27, 37);
+                    ctx.set_visuals(visuals);
                 }
-                ctx.set_visuals(visuals);
             }
         }
 

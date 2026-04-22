@@ -1,6 +1,6 @@
 # Maintainer: Marcel Zimmer <https://www.marcelzimmer.de>
 pkgname=mz-hyprnurs
-pkgver=1.0.0
+pkgver=1.0.1
 pkgrel=1
 pkgdesc="Desktop-App für die pflegerische Übergabe im Krankenhaus"
 arch=('x86_64')

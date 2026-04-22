@@ -4,7 +4,7 @@
 **Web:** [www.marcelzimmer.de](https://www.marcelzimmer.de)<br>
 **X:** [@marcelzimmer](https://x.com/marcelzimmer)<br>
 **GitHub:** [@marcelzimmer](https://github.com/marcelzimmer)<br>
-**Version:** 1.0.0<br>
+**Version:** 1.0.1<br>
 **Sprache:** Rust<br>
 **App-Sprache:** Deutsch<br>
 **Plattform:** Primär für **Omarchy Linux** (eine Arch-Linux-Distribution) mit **Hyprland** entwickelt und optimiert - läuft selbstverständlich auch unter Windows, macOS und jedem anderen Linux<br>
@@ -710,13 +710,17 @@ Sechs Themes, umschaltbar mit `Strg+T`:
 Die Funktion `omarchy_farben_laden` liest TOML-Zeilen der Form `key = "#rrggbb"` aus
 `~/.config/omarchy/current/theme/colors.toml` ein.
 
-| TOML-Schlüssel | Verwendung in der App                    |
-|----------------|------------------------------------------|
-| `background`   | Fensterhintergrund und Kartenhintergrund |
-| `foreground`   | Texte in Eingabefeldern                  |
-| `accent`       | Kopfblock, Buttons, Hover-Effekte        |
-| `color3`       | Beschriftungen [Labels]                  |
-| `color8`       | Trennlinien, Hover-Hintergrund           |
+| TOML-Schlüssel         | Verwendung in der App                            |
+|------------------------|--------------------------------------------------|
+| `background`           | Fenster- und Kartenhintergrund                   |
+| `foreground`           | Primärtext                                       |
+| `accent`               | Kopfblock, Selektion, Hyperlinks, Fokus-Strich   |
+| `selection_background` | Hintergrund für Textauswahl [Fallback: accent]   |
+| `selection_foreground` | Textfarbe für Textauswahl                        |
+
+Labels, Trennlinien und Hover-Flächen werden aus einem WCAG-konformen Blend zwischen `foreground` und `background` abgeleitet. Der Basis-Modus [hell/dunkel] folgt der Luminanz des Hintergrunds, die Kopftext-Farbe wird automatisch zwischen Schwarz und Weiß gewählt - je nachdem, welche Farbe gegen den Akzent den besseren Kontrast liefert.
+
+Damit sieht die App bei jedem aktuellen und zukünftigen Omarchy-Theme sauber aus, ohne dass pro Theme eine eigene Farbdatei nötig ist.
 
 Das Omarchy-Theme wird nur im Zyklus angeboten, wenn die Konfigurationsdatei gefunden wurde [`hat_omarchy = true`]. Beim Start wählt die App automatisch Omarchy, wenn verfügbar - das ist der Standard auf **Omarchy Linux**. Ist keine Omarchy-Konfiguration vorhanden, startet die App mit dem **schwarz-roten Theme** als Standard.
 
@@ -906,4 +910,4 @@ xattr -cr /pfad/zu/MZ-HyprNurs.app
 
 ---
 
-*Diese README wurde am 17.04.2026 erstellt und zuletzt aktualisiert am 17.04.2026 [Version 1.0.0].*
+*Diese README wurde am 17.04.2026 erstellt und zuletzt aktualisiert am 22.04.2026 [Version 1.0.1].*
