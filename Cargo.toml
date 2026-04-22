@@ -2,6 +2,11 @@
 name = "mz-hyprnurs"
 version = "1.0.1"
 edition = "2021"
+authors = ["Marcel Zimmer"]
+description = "Desktop-App für die pflegerische Übergabe im Krankenhaus"
+license = "MIT"
+repository = "https://github.com/marcelzimmer/mz-hyprnurs"
+homepage = "https://www.marcelzimmer.de"
 
 [dependencies]
 eframe = "0.29"
