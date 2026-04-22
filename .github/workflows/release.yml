@@ -71,6 +71,12 @@ jobs:
       - name: Build
         run: cargo build --release --target aarch64-apple-darwin
 
+      - name: Sync version from git tag into Info.plist
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" assets/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" assets/Info.plist
+
       - name: Create .app bundle
         run: |
           BUNDLE="MZ-HyprNurs.app"
