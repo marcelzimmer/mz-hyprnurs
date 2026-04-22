@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 APP_NAME="mz-hyprnurs"
 BIN_DIR="$HOME/.local/bin"
@@ -51,6 +51,10 @@ Type=Application
 Categories=Office;MedicalSoftware;
 Terminal=false
 EOF
+
+# Caches aktualisieren, damit Icon und Desktop-Eintrag sofort sichtbar sind
+command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$DESKTOP_DIR" >/dev/null 2>&1 || true
+command -v gtk-update-icon-cache  >/dev/null 2>&1 && gtk-update-icon-cache -t "$HOME/.local/share/icons/hicolor" >/dev/null 2>&1 || true
 
 echo "Done! $APP_NAME installed to $BIN_DIR/$APP_NAME"
 echo "Desktop entry created. App should appear in your launcher."
